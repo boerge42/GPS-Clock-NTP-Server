@@ -23,6 +23,22 @@
 *  - Senden von diversen Informationen via MQTT
 * 
 * 
+* Anforderungen (SW-Umgebung):
+* ----------------------------
+* Arduino-IDE (für übersetzen/flashen):
+*  - Version 2.3.8
+* Board: 
+*  -  Arduino‑ESP32‑Cores 3.3.10 (Espressif Systems)
+* Bibliotheken:
+*  - Adafruit_GFX 1.12.6
+*  - Adafruit_SSD1327 1.0.4
+*  - EspSoftwareSerial 8.1.0
+*  - TinyGPSPlus 1.0.3
+*  - PubSubClient 2.8
+*  - WiFi 1.2.7
+*  - ...und deren entsprechendnen Voraussetzungen
+* 
+* 
 * =========
 * Have fun!
 *
