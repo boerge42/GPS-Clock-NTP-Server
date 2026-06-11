@@ -18,7 +18,13 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 - GT-U7 (GPS-Modul mit herausgeführten PPS-Signal)
 - [OLED SSD1327](https://www.waveshare.com/wiki/1.5inch_OLED_Module) als Ausgabemedium für diverse Informationen
 
-Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware ablesbar.
+Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder den folgenden beiden Bildern ablesbar.
+
+<img src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/circuit.png" title="" alt="circuid" width="534">
+
+(Ein einfacher "Schaltplan"...)
+
+
 
 <img title="" src="images/hardware.jpg" alt="Bild" width="538">
 
@@ -54,7 +60,7 @@ Folgende Tasks sind dazu implementiert worden:
   
   * Anzahl Zugriffe auf NTP-Server (aus `task_ntpserver`)
     
-    <img title="" src="images/oled.jpg" alt="OLED" width="315">
+    <img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/oled.jpg" alt="OLED" width="315">
     
     (Ausgaben auf dem OLED; die einzelnen "Informationsblöcke" sollten selbsterklärend sein...)
 - `task_phaseadj2mqtt`: Senden von diversen Informationen aus `task_adjtime` (Phase, adjtime-Wert, Reglerzustände, Latenz zw. PPS-Interrupt und dessen Verarbeitung) via MQTT
@@ -84,10 +90,10 @@ Die Genauigkeit der Uhr hängt u.a. von folgenden Faktoren ab:
   - Latenz zwischen PPS-Interrupt und tatsächlicher Verarbeitung --> hier realtiv konstant ca. 20-22 Mikrosekunden (gemessen)
     
     <img src="images/latenz_pps.jpg" title="" alt="latenz" width="572">
-
-- "zufällige" Verzögerungen durch nicht identische Programmdurchläufe bei der Verarbeitung eines PPS-Signals (z.B. if/then/else)
-
-- Einflüsse durch den Scheduler des unterlagerten FreeRTOS (welche Task ist gerade aktiv, Taskreihenfolge, Blockungen etc.); hier könnte man sicherlich noch etwas verbessern (Prioritäten, CPU-Verteilung u.ä.)
+  
+  - "zufällige" Verzögerungen durch nicht identische Programmdurchläufe bei der Verarbeitung eines PPS-Signals (z.B. if/then/else)
+  
+  - Einflüsse durch den Scheduler des unterlagerten FreeRTOS (welche Task ist gerade aktiv, Taskreihenfolge, Blockungen etc.); hier könnte man sicherlich noch etwas verbessern (Prioritäten, CPU-Verteilung u.ä.)
 
 - [Auflösung](https://de.wikipedia.org/wiki/Aufl%C3%B6sung_(Messtechnik)) der internen Timer, die zur Darstellung der Zeit und zur Messung von Zeitabständen verwendet werden --> ESP32: jeweils kleinste Auflösung 1 Mikrosekunde
 
@@ -103,8 +109,6 @@ Das alles "betrachtet", dürfte mit Sicherheit eine Uhr und einen NTP-Server erg
 
 ![Phase](images/phase.jpg)
 (PI-Regler-Verhalten der Phasen-Verschiebung in `task_adjtime` über die Zeit; beginnend mit dem Start des ESP32...)
-
-
 
 ---
 
