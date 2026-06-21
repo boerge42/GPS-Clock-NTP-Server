@@ -11,6 +11,22 @@
 * - GPS-Modul mit PPS-Signal; z.B. GT-U7
 * - OLED SSD1327
 * 
+* Pin-Verbindungen:
+* +---------+------+------+
+* | ESP32-P4| GPS  | OLED |
+* +---------+------+------+
+* |   GND   | GND  | GND  |
+* |   3V3   | VCC  | VCC  |
+* |   33    | RXD  |      |
+* |   32    | TXD  |      |
+* |   27    | PPS  |      |
+* |   26    |      | RST  |
+* |   23    |      | DC   |
+* |   22    |      | CS   |
+* |   21    |      | CLK  |
+* |   20    |      | DIN  |
+* +---------+------+------+
+* 
 * 
 * Funktionalitäten:
 * -----------------
@@ -330,6 +346,16 @@ String dopvalue2qualitytext(float dop)
 }
 
 // *********************************************************************
+// läuft noch das letzte adjtime()?
+long adjtime_remaining() {
+    struct timeval remaining = {0};
+    // NULL = keine neue Korrektur setzen
+    // remaining = noch ausstehende Korrektur
+    adjtime(NULL, &remaining);
+    return (remaining.tv_sec*1000000 + remaining.tv_usec);
+}
+
+// *********************************************************************
 void task_gps_read(void *pvParameters) {
     for (;;) {
         while (gpsSerial.available()) {
@@ -459,7 +485,7 @@ void task_adjtime(void *pvParameters) {
         struct timeval tv;
         gettimeofday(&tv, nullptr);
         long latenz = micros() - last_pps_micros;
-        long phase = tv.tv_usec;
+        long phase = tv.tv_usec - latenz;  // es ist etwas "latenz" vergangen, bis wir hier sind
         if (phase > 500000)  phase -= 1000000;
         if (phase < -500000) phase += 1000000;
         
@@ -473,11 +499,16 @@ void task_adjtime(void *pvParameters) {
         // 3) PI-Regler
         float u = Kp * filtered + I; // Reglerausgang
         long adj_usec = -(long)u;    // adjtime bekommt das NEGATIVE
+        
         // adjtime()
-        struct timeval adj;
-        adj.tv_sec  = 0;
-        adj.tv_usec = adj_usec;
-        adjtime(&adj, nullptr);
+        Serial.println(adjtime_remaining());
+        if (adjtime_remaining() == 0) {
+            struct timeval adj;
+            adj.tv_sec  = 0;
+            adj.tv_usec = adj_usec;
+            adjtime(&adj, nullptr);
+            Serial.println("adjtime!");
+        }
         
         // --> MQTT
         msg.phase = phase;
