@@ -34,7 +34,9 @@ Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechend
 |   22    |      | CS   |
 |   21    |      | CLK  |
 |   20    |      | DIN  |
-+---------+------+------+`<img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/circuit.png" alt="circuid" width="534" data-align="inline">
++---------+------+------+`
+
+<img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
 
 (Ein einfacher "Schaltplan"...)
 
