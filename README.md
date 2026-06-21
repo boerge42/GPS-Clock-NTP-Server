@@ -21,19 +21,33 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder der Tabelle sowie den folgenden beiden Bildern ablesbar.
 
 `Pin-Verbindungen:
+
 +---------+------+------+
+
 | ESP32-P4| GPS  | OLED |
+
 +---------+------+------+
+
 |   GND   | GND  | GND  |
+
 |   3V3   | VCC  | VCC  |
+
 |   33    | RXD  |      |
+
 |   32    | TXD  |      |
+
 |   27    | PPS  |      |
+
 |   26    |      | RST  |
+
 |   23    |      | DC   |
+
 |   22    |      | CS   |
+
 |   21    |      | CLK  |
+
 |   20    |      | DIN  |
+
 +---------+------+------+`
 
 <img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
