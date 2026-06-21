@@ -18,13 +18,25 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 - GT-U7 (GPS-Modul mit herausgeführten PPS-Signal)
 - [OLED SSD1327](https://www.waveshare.com/wiki/1.5inch_OLED_Module) als Ausgabemedium für diverse Informationen
 
-Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder den folgenden beiden Bildern ablesbar.
+Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder der Tabelle sowie den folgenden beiden Bildern ablesbar.
 
-<img src="images/circuit.png" title="" alt="circuid" width="534">
+`Pin-Verbindungen:
++---------+------+------+
+| ESP32-P4| GPS  | OLED |
++---------+------+------+
+|   GND   | GND  | GND  |
+|   3V3   | VCC  | VCC  |
+|   33    | RXD  |      |
+|   32    | TXD  |      |
+|   27    | PPS  |      |
+|   26    |      | RST  |
+|   23    |      | DC   |
+|   22    |      | CS   |
+|   21    |      | CLK  |
+|   20    |      | DIN  |
++---------+------+------+`<img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/circuit.png" alt="circuid" width="534" data-align="inline">
 
 (Ein einfacher "Schaltplan"...)
-
-
 
 <img title="" src="images/hardware.jpg" alt="Bild" width="538">
 
@@ -60,7 +72,7 @@ Folgende Tasks sind dazu implementiert worden:
   
   * Anzahl Zugriffe auf NTP-Server (aus `task_ntpserver`)
     
-    <img title="" src="images/oled.jpg" alt="OLED" width="315">
+    <img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/oled.jpg" alt="OLED" width="315">
     
     (Ausgaben auf dem OLED; die einzelnen "Informationsblöcke" sollten selbsterklärend sein...)
 - `task_phaseadj2mqtt`: Senden von diversen Informationen aus `task_adjtime` (Phase, adjtime-Wert, Reglerzustände, Latenz zw. PPS-Interrupt und dessen Verarbeitung) via MQTT

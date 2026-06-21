@@ -185,6 +185,8 @@ In Task task_ntpserver einen Zähler einbauen, der die NTP-Requests zählt und d
 
 ## phase-Regler verbessern (task_adjtime)
 
+**Beobachtung:** es dauert ca. 3 Stunden, bis sich die Uhrzeit auf den PPS-Impuls synchronisiert hat!
+
 **Vermutung:** adjtime() und der PI-Regler in der Task arbeiten gegeneinander
 
 **Idee:** kein adjtime() bei <u>jedem</u> PPS-Impuls aufrufen, sondern nur dann, wenn PPS-Impuls <u>und</u> das letzte adjtime() fertig ist.
@@ -205,6 +207,25 @@ bool adjtime_done() {
 ```
 
 Abfrage direkt bei adjtime() in task_adjtime einbauen (kein adjtime(), wenn adjtime_done() == false). Evtl. diesen Status auch in MQTT-Message packen (Visualisierung Regler-Verhalten in Influx/Grafana).
+
+**Ergebnis:** Habe es eingebaut, bringt aber keinen Effekt...! 
+
+**Grund:** bei diesen kleinen Adjust-Werten (max. im mittleren 3-stelligen Mikrosekunden-Bereich) ist adjtime() nach einer Sekunde fertig!
+
+- [x] Erledigt? 
+- [ ] ...und kann man auch wieder ausbauen ;-)
+
+Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist ungeeignet bzw. Parameter müssen verändert werden!
+
+**Idee:** wir verwenden etwas anderes bzw. tunen noch ein wenig!
+
+- [ ] Erledigt?
+
+## Rückgabewerte NTP-Server überprüfen, überarbeiten
+
+- derzeit hart codierte Werte anschauen und eventuell berechnen, wenn möglich
+
+- Reihenfolge/Programmzeile für Timestamps etc. nochmal ansehen, ob korrekt
 
 - [ ] Erledigt?
 
