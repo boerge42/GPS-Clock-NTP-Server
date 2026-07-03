@@ -76,7 +76,7 @@ Folgende Tasks sind dazu implementiert worden:
   
   * Anzahl Zugriffe auf NTP-Server (aus `task_ntpserver`)
     
-    <img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/oled.jpg" alt="OLED" width="315">
+    <img title="" src="images/oled.jpg" alt="OLED" width="315">
     
     (Ausgaben auf dem OLED; die einzelnen "Informationsblöcke" sollten selbsterklärend sein...)
 - `task_phaseadj2mqtt`: Senden von diversen Informationen aus `task_adjtime` (Phase, adjtime-Wert, Reglerzustände, Latenz zw. PPS-Interrupt und dessen Verarbeitung) via MQTT
