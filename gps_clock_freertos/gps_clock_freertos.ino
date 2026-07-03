@@ -176,9 +176,12 @@ struct oled_t {
 volatile unsigned long last_pps_micros = 0;
 
 // globale Variable für aktuellen Status der Uhr-Synchronisation
-volatile int sync_level = 0;    // 0: keinerlei Sync; 
-                                // 1: datetime ist initial gesetzt; 
-                                // 2: datetime ist mit PPS synchronisiert  
+enum sync_level_index {
+        NO_SYNC,                // keinerlei Sync;
+        NMEA_SYNC,              // datetime ist initial aus NMEA-Daten gesetzt;
+        PPS_SYNC                // datetime ist mit PPS synchronisiert
+};
+volatile int sync_level = NO_SYNC; 
 
 // globale Variable PPS-Impuls lag an
 volatile boolean pps_is_set = false;
@@ -300,12 +303,12 @@ void IRAM_ATTR isr_pps_signal() {
     pps_is_set = true;
     last_pps_micros = micros();
     // je nach Sync-Level, Signal an richtige Task senden
-    if (sync_level == 2) {
+    if (sync_level == PPS_SYNC) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         vTaskNotifyGiveFromISR(handle_task_adjtime, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     } else
-    if (sync_level == 1) {
+    if (sync_level == NMEA_SYNC) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         vTaskNotifyGiveFromISR(handle_task_sync_datetime, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -404,7 +407,10 @@ void task_satellites2oled(void *pvParameters) {
 // benötigt welche aber noch nicht mit dem PPS-Signal synchronisiert 
 void task_set_first_datetime(void *pvParameters) {
     for (;;) {
-        if (gps.date.isUpdated() && gps.time.isUpdated() && gps.date.isValid() && gps.time.isValid()) {
+
+        // ...dieser if scheint noch nicht ganz zu reichen (Versatz von 1-2s zur Realität gesehen...), 
+        // evtl. müssen noch hdop, vdop und/oder pdop betrachtet werden?  
+        if (gps.date.isValid() && gps.time.isValid() && atoi(fix_type.value()) == 3 && (gps.date.year() > 2025)) {
                 struct tm t = {0};
                 t.tm_year = gps.date.year() - 1900;
                 t.tm_mon  = gps.date.month() - 1;
@@ -414,18 +420,19 @@ void task_set_first_datetime(void *pvParameters) {
                 t.tm_sec  = gps.time.second();
                 t.tm_isdst = 0;
                 
-                //~ time_t epoch = my_timegm(&t);
                 setenv("TZ", "UTC", 1); tzset();  // UTC
                 time_t epoch = mktime(&t);
                 setenv("TZ", MY_TZ, 1); tzset();  // lokale Zeitzone
                 
                 struct timeval tv;
                 tv.tv_sec = epoch;
-                //tv.tv_usec = gps.time.centisecond() * 10000; // optional
+                //tv.tv_usec = 0;
+                tv.tv_usec = gps.time.centisecond() * 10000;
                 settimeofday(&tv, nullptr);
+                
                 Serial.println("-> set first datetime (Task delete)");
-                //~ datetime_is_set_initial = true;
-                sync_level = 1;
+
+                sync_level = NMEA_SYNC;
                 // ...danach wird diese Task erstmal nicht mehr benötigt
                 //~ vTaskSuspend(handle_task_set_first_datetime);
                 vTaskDelete(handle_task_set_first_datetime);
@@ -451,7 +458,7 @@ void task_sync_datetime(void *pvParameters) {
             tv.tv_sec += 1;         // PPS-Signal VOR der Sekunde, die gemeint ist!
             tv.tv_usec  = latenz;   // 0+latenz; Laufzeit zw. PPS-Signal und dieser Stelle einberechnen
             settimeofday(&tv, nullptr);
-            sync_level = 2;
+            sync_level = PPS_SYNC;
             Serial.printf("-> sync datetime (Task delete); latenz zu PPS=%ldus\n", latenz);
             // ...danach nur noch adjtime(drift) via task_adjtime()
             //~ vTaskSuspend(handle_task_sync_datetime);
@@ -485,30 +492,27 @@ void task_adjtime(void *pvParameters) {
         struct timeval tv;
         gettimeofday(&tv, nullptr);
         long latenz = micros() - last_pps_micros;
-        long phase = tv.tv_usec - latenz;  // es ist etwas "latenz" vergangen, bis wir hier sind
+        long phase = tv.tv_usec - latenz;       // es ist etwas "latenz" vergangen, bis wir hier sind
+                                                // ...ggf. an dieser Stelle etwas glätten (moving Avg.)?
         if (phase > 500000)  phase -= 1000000;
         if (phase < -500000) phase += 1000000;
         
-        // 1) Filter
+        // Filter...
         filtered = filtered * (1.0f - alpha) + phase * alpha;
-        // 2) Integrator – WICHTIG: GENAU SO
+        // Integrator...
         I += filtered * Ki;          // kein Minus, Ki > 0
-        // Anti-Windup
+        // Anti-Windup...
         if (I > 200.0f)  I = 200.0f;
         if (I < -200.0f) I = -200.0f;
-        // 3) PI-Regler
+        // PI-Regler...
         float u = Kp * filtered + I; // Reglerausgang
-        long adj_usec = -(long)u;    // adjtime bekommt das NEGATIVE
+        long adj_usec = -(long)u;    // adjtime bekommt das Negative
         
         // adjtime()
-        Serial.println(adjtime_remaining());
-        if (adjtime_remaining() == 0) {
-            struct timeval adj;
-            adj.tv_sec  = 0;
-            adj.tv_usec = adj_usec;
-            adjtime(&adj, nullptr);
-            Serial.println("adjtime!");
-        }
+        struct timeval adj;
+        adj.tv_sec  = 0;
+        adj.tv_usec = adj_usec;
+        adjtime(&adj, nullptr);
         
         // --> MQTT
         msg.phase = phase;
@@ -607,53 +611,66 @@ void task_ntpserver(void *param) {
     static long ntp_counter = 0;
     oled_t msg;
     for (;;) {
-        if (sync_level == 2) {
-            if (udp.parsePacket() == 48) {
-                ntp_packet_t request;
-                udp.read((uint8_t*)&request, 48);
+        if (udp.parsePacket() == 48) {
+            ntp_packet_t request;
+            udp.read((uint8_t*)&request, 48);
 
-                uint64_t recvTS = get_ntp_timestamp();
-                uint64_t txTS   = get_ntp_timestamp();
+            uint64_t recvTS = get_ntp_timestamp();
 
-                ntp_packet_t reply = {0};
+            ntp_packet_t reply = {0};
 
-                reply.li_vn_mode = 0b00100100; // LI=0, Version=4, Mode=4
-                reply.stratum = 1;             // wenn z.B. GPS-Zeit mit PPS...
-                reply.poll = 6;                // 6 gut; evtl. 10 bei Stratum 1
-                reply.precision = -20;         // guter Wert für GPS-PPS auf ESP32
-
-                //~ reply.rootDelay = htonl(1 << 16);       // 1.0s???
-                //~ reply.rootDispersion = htonl(1 << 16);  // 1.0s???
-                
-                reply.rootDelay = htonl((uint32_t)(0.000015 * 65536.0));        // 15us
-                reply.rootDispersion = htonl((uint32_t)(0.000005 * 65536.0));   // 5us
-                
-                reply.refId = htonl(0x47505300); // "GPS" + 0 (PPS?)
-
-                uint64_t refTS = get_ntp_timestamp();
-                reply.refTimestampSec  = htonl((uint32_t)(refTS >> 32));
-                reply.refTimestampFrac = htonl((uint32_t)(refTS & 0xFFFFFFFF));
-
-                reply.origTimestampSec  = request.txTimestampSec;
-                reply.origTimestampFrac = request.txTimestampFrac;
-
-                reply.recvTimestampSec  = htonl((uint32_t)(recvTS >> 32));
-                reply.recvTimestampFrac = htonl((uint32_t)(recvTS & 0xFFFFFFFF));
-
-                reply.txTimestampSec  = htonl((uint32_t)(txTS >> 32));
-                reply.txTimestampFrac = htonl((uint32_t)(txTS & 0xFFFFFFFF));
-
-                udp.beginPacket(udp.remoteIP(), udp.remotePort());
-                udp.write((uint8_t*)&reply, 48);
-                udp.endPacket();
-                
-                ntp_counter++;
-                
-                // Counter auf OLED anzeigen
-                msg.area = NTP_REQUESTS;
-                snprintf(msg.text, sizeof(msg.text), "NTP-Req.: %d", ntp_counter);
-                xQueueSend(queue_oled, &msg, portMAX_DELAY);
+            // ein paar Werte in Abhängigkeit des sync_levels setzen
+            switch (sync_level) {
+                case NO_SYNC:
+                    reply.li_vn_mode = 0b11100100;      // LI=3, Version=4, Mode=4
+                    reply.stratum = 16;                 // unsync.
+                    reply.refId = htonl(0x494E4954);    // "INIT"
+                    break;
+                case NMEA_SYNC:
+                    reply.li_vn_mode = 0b00100100;      // LI=0, Version=4, Mode=4
+                    reply.stratum = 1;                  // naja, aber, lt. Definition, schon...
+                    reply.refId = htonl(0x47505300);    // "GPS"
+                    break;
+                case PPS_SYNC:
+                    reply.li_vn_mode = 0b00100100;      // LI=0, Version=4, Mode=4
+                    reply.stratum = 1;                  // wir werten das PPS-Sinal aus!
+                    reply.refId = htonl(0x50505300);    // "PPS"
+                    break;
             }
+
+            reply.poll = 6;                // 6 gut; evtl. 10 bei Stratum 1
+            reply.precision = -20;         // guter Wert für GPS-PPS auf ESP32
+
+            //~ reply.rootDelay = htonl(1 << 16);       // 1.0s???
+            //~ reply.rootDispersion = htonl(1 << 16);  // 1.0s???
+            
+            reply.rootDelay = htonl((uint32_t)(0.000015 * 65536.0));        // 15us
+            reply.rootDispersion = htonl((uint32_t)(0.000005 * 65536.0));   // 5us <<== hier müssen wir nochmal ran!
+
+            uint64_t refTS = get_ntp_timestamp();
+            reply.refTimestampSec  = htonl((uint32_t)(refTS >> 32));
+            reply.refTimestampFrac = htonl((uint32_t)(refTS & 0xFFFFFFFF));
+
+            reply.origTimestampSec  = request.txTimestampSec;
+            reply.origTimestampFrac = request.txTimestampFrac;
+
+            reply.recvTimestampSec  = htonl((uint32_t)(recvTS >> 32));
+            reply.recvTimestampFrac = htonl((uint32_t)(recvTS & 0xFFFFFFFF));
+
+            uint64_t txTS   = get_ntp_timestamp();
+            reply.txTimestampSec  = htonl((uint32_t)(txTS >> 32));
+            reply.txTimestampFrac = htonl((uint32_t)(txTS & 0xFFFFFFFF));
+
+            udp.beginPacket(udp.remoteIP(), udp.remotePort());
+            udp.write((uint8_t*)&reply, 48);
+            udp.endPacket();
+            
+            ntp_counter++;
+            
+            // Counter auf OLED anzeigen
+            msg.area = NTP_REQUESTS;
+            snprintf(msg.text, sizeof(msg.text), "NTP-Req.: %d", ntp_counter);
+            xQueueSend(queue_oled, &msg, portMAX_DELAY);
         }
         vTaskDelay(pdMS_TO_TICKS(1));
     }

@@ -213,7 +213,7 @@ Abfrage direkt bei adjtime() in task_adjtime einbauen (kein adjtime(), wenn adjt
 **Grund:** bei diesen kleinen Adjust-Werten (max. im mittleren 3-stelligen Mikrosekunden-Bereich) ist adjtime() nach einer Sekunde fertig!
 
 - [x] Erledigt? 
-- [ ] ...und kann man auch wieder ausbauen ;-)
+- [x] ...und kann man auch wieder ausbauen ;-)
 
 Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist ungeeignet bzw. Parameter müssen verändert werden!
 
@@ -223,17 +223,70 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
 
 ## Rückgabewerte NTP-Server überprüfen, überarbeiten
 
+- NTP-Request negativ quittieren, wenn noch keine vernünftige Zeit gesetzt ist (~~bzw. unbeantwortet lassen~~); bei `sync_level < 1`?
+  Wir bauen das hier ein:
+  
+  - sync_level < 1: stratum=16; refID="INIT" (0x494E4954); li=0b11100100
+  
+  - sync_level == 1: stratum=1; refID="GPS" (0x47505300); li=0b00100100
+  
+  - sync_lecel == 2: stratum=1; refID="PPS" (0x50505300); li=0b00100100
+
+- [x]  Erledigt?
+
 - derzeit hart codierte Werte anschauen und eventuell berechnen, wenn möglich
+  
+  - poll (empfohlenes Abfrageintervall in s) --> 6-10 guter Wert für synchr. Zeit
+  
+  - precision (Auflösung Uhrzeit) --> ESP32 = 1us --> = -20
+  
+  - rootDelay --> bei PPS nahe 0 bzw. wenige Mikrosekunden
+  
+  - rootDispersion (maximale Fehler relativ zur Referenzzeit) --> vielleicht ungefähr so:
+    
+    ```cpp
+    
+    volatile unsigned long last_pps_micros = 0;
+    
+    void IRAM_ATTR isr_pps_signal() {
+        last_pps_time = now();
+        last_pps_micros() = micros();
+    }
+    
+    double get_root_dispersion() {
+        double base_dispersion = 5e-6;   // 5 - 20 µs
+        double drift_rate = 20e-6;       // 20 ppm (RTC geschätzt); phase?
+    
+        double dt = (micros() - last_pps_time) / 1000000;  // in Sekunden!
+        return base_dispersion + drift_rate * dt;
+    }
+    ```
 
-- Reihenfolge/Programmzeile für Timestamps etc. nochmal ansehen, ob korrekt
+- [ ]  Erledigt?
 
-- [ ] Erledigt?
+- Reihenfolgen/Programmzeilen für Timestamps etc. nochmal ansehen, ob korrekt
+
+- [x] Erledigt?
 
 ## Was passiert, wenn auch GPS-Modul initialisiert wird
 
-Testen und evtl. Problemen entgegenwirken
+- Testen und evtl. Problemen entgegenwirken
 
-- [ ] Getestet?
+- [x] Getestet? --> wir müssen was tun ;-)
+
+- In `task_set_first_datetime` gehen wir erst einen Schritt weiter, wenn dieser if zutrifft:
+  `if (gps.date.isValid() && gps.time.isValid() && atoi(fix_type.value()) == 3 && (gps.date.year() > 2025))`
+  Bedeutet aber auch, dass wir immer ein 3D-Fix habe müssen...!
+  
+  (dabei folgende Unzulänglichkeit gefunden: tv.tv_usec sollte initial mit gesetzt werden, sonst kommen kommische Zeiten raus...)
+
+- [x] Erledigt?
+
+- hmm, beim Testen ist aufgefallen, dass manchmal am Anfang der Initialiserung (des GPS-Moduls?), trotz 3D-Fix, die Sekunden (aus NMEA-Daten?) nicht immer stimmen (Differenz 1-2s). Beobachten, ggf. entgegenwirken...
+
+- [ ] Erledigt?
+
+
 
 ## Was muss passieren, wenn PPS-Signal für längere Zeit nicht da?
 
@@ -249,4 +302,4 @@ Noch mal klären, ob es so optimal ist...
 
 ## Schicke(s) Tool(s), um Qualität dieses NTP-Server mit anderen zu vergleichen
 
-hmmm, noch keine richtige Idee, bis auf dieses Python-Script...
+list-ntp-server.py --> Momentaufnahme mehrere NTP-Server (Python-Lib: ntplib)
