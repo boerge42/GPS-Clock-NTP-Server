@@ -34,7 +34,9 @@ Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechend
 |   22    |      | CS   |
 |   21    |      | CLK  |
 |   20    |      | DIN  |
-+---------+------+------+`<img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/circuit.png" alt="circuid" width="534" data-align="inline">
++---------+------+------+`
+
+<img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
 
 (Ein einfacher "Schaltplan"...)
 
@@ -72,7 +74,7 @@ Folgende Tasks sind dazu implementiert worden:
   
   * Anzahl Zugriffe auf NTP-Server (aus `task_ntpserver`)
     
-    <img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/oled.jpg" alt="OLED" width="315">
+    <img title="" src="images/oled.jpg" alt="OLED" width="315">
     
     (Ausgaben auf dem OLED; die einzelnen "Informationsblöcke" sollten selbsterklärend sein...)
 - `task_msg2mqtt`: Senden von diversen Informationen aus `task_adjtime` und  `task_satellites2oled` via MQTT
