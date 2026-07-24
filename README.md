@@ -20,8 +20,7 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 
 Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder der Tabelle sowie den folgenden beiden Bildern ablesbar.
 
-```cpp
-Pin-Verbindungen:
+`Pin-Verbindungen:
 +---------+------+------+
 | ESP32-P4| GPS  | OLED |
 +---------+------+------+
@@ -35,10 +34,7 @@ Pin-Verbindungen:
 |   22    |      | CS   |
 |   21    |      | CLK  |
 |   20    |      | DIN  |
-+---------+------+------+
-```
-
-<img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
++---------+------+------+`<img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/circuit.png" alt="circuid" width="534" data-align="inline">
 
 (Ein einfacher "Schaltplan"...)
 
@@ -76,10 +72,10 @@ Folgende Tasks sind dazu implementiert worden:
   
   * Anzahl Zugriffe auf NTP-Server (aus `task_ntpserver`)
     
-    <img title="" src="images/oled.jpg" alt="OLED" width="315">
+    <img title="" src="file:///home/bergeruw/mnt/banane/home/bergeruw/work/esp32-p4-eth/gps_clock_freertos/images/oled.jpg" alt="OLED" width="315">
     
     (Ausgaben auf dem OLED; die einzelnen "Informationsblöcke" sollten selbsterklärend sein...)
-- `task_phaseadj2mqtt`: Senden von diversen Informationen aus `task_adjtime` (Phase, adjtime-Wert, Reglerzustände, Latenz zw. PPS-Interrupt und dessen Verarbeitung) via MQTT
+- `task_msg2mqtt`: Senden von diversen Informationen aus `task_adjtime` und  `task_satellites2oled` via MQTT
 
 <img title="" src="images/freertos_tasks.drawio.png" alt="Tasks" width="691">
 
@@ -125,6 +121,25 @@ Das alles "betrachtet", dürfte mit Sicherheit eine Uhr und einen NTP-Server erg
 
 ![Phase](images/phase.jpg)
 (PI-Regler-Verhalten der Phasen-Verschiebung in `task_adjtime` über die Zeit; beginnend mit dem Start des ESP32...)
+
+
+
+## Warum werden diverse Daten via MQTT versendet?
+
+Um das Verhalten der Uhr zu verstehen bzw. zu überprüfen, ist es sinnvoll ein paar Daten, Parameter, Zustände etc. aufzuzeichnen und deren zeitlichen Verlauf in einer geeigneten Datenbank abzulegen. Ich verwende dafür gern folgenden Konstrukt:
+
+[MQTT-Nachricht](https://de.wikipedia.org/wiki/MQTT) --> [MQTT-Broker](https://mosquitto.org/) --> [Telegraf](https://www.influxdata.com/time-series-platform/telegraf/) --> [InfluxDB](https://www.influxdata.com/) --> [Grafana](https://grafana.com/)
+
+
+## Weitere Informationen
+
++ [ToDo-Liste](TODO.md)
+
++ [relevante NMEA-Datensätze](NMEA.md)
+
++ [Aufbau NTP-Paket](NPT.md)
+
+
 
 ---
 

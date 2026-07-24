@@ -232,7 +232,7 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
   
   - sync_lecel == 2: stratum=1; refID="PPS" (0x50505300); li=0b00100100
 
-- [x]  Erledigt?
+- [x] Erledigt?
 
 - derzeit hart codierte Werte anschauen und eventuell berechnen, wenn möglich
   
@@ -245,7 +245,6 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
   - rootDispersion (maximale Fehler relativ zur Referenzzeit) --> vielleicht ungefähr so:
     
     ```cpp
-    
     volatile unsigned long last_pps_micros = 0;
     
     void IRAM_ATTR isr_pps_signal() {
@@ -262,7 +261,7 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
     }
     ```
 
-- [ ]  Erledigt?
+- [ ] Erledigt?
 
 - Reihenfolgen/Programmzeilen für Timestamps etc. nochmal ansehen, ob korrekt
 
@@ -274,6 +273,10 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
 
 - [x] Getestet? --> wir müssen was tun ;-)
 
+
+
+
+
 - In `task_set_first_datetime` gehen wir erst einen Schritt weiter, wenn dieser if zutrifft:
   `if (gps.date.isValid() && gps.time.isValid() && atoi(fix_type.value()) == 3 && (gps.date.year() > 2025))`
   Bedeutet aber auch, dass wir immer ein 3D-Fix habe müssen...!
@@ -282,11 +285,19 @@ Dann **nächste These, warum PPS-Sync. so lange dauert:** Der PI-Regler ist unge
 
 - [x] Erledigt?
 
-- hmm, beim Testen ist aufgefallen, dass manchmal am Anfang der Initialiserung (des GPS-Moduls?), trotz 3D-Fix, die Sekunden (aus NMEA-Daten?) nicht immer stimmen (Differenz 1-2s). Beobachten, ggf. entgegenwirken...
-
-- [ ] Erledigt?
 
 
+
+
+- hmm, beim Testen ist aufgefallen, dass manchmal am Anfang der Initialiserung (des GPS-Moduls?), trotz 3D-Fix, die Sekunden (aus NMEA-Daten?) nicht immer stimmen (<u>Differenz 1-2s)</u>. Beobachten, ggf. entgegenwirken...
+
+- Mit "Copilot" habe ich ein paar Quellen gefunden, die besagen, dass die, vom GPS-Modul, gesendete NMEA-Uhrzeit erst dann gesichert stimmt, wenn "Subframe 4/5 der Navigations Messages" empfangen wurden --> <u>das dauert in der Regel ca. 12,5 Minuten!</u>
+  [The Almanac, Time to First Fix and Satellite Health | GEOG 862: GPS and GNSS](https://courses.ems.psu.edu/geog862/node/1739)
+  [Basic GPS; Module 1: Global Positioning System; Lecture 6 : GPS Principles](https://archive.nptel.ac.in/content/storage2/courses/105104100/lectureB_6/B_6_5msg.htm)
+
+- Den Empfang von "Subframe4/5" könnte man aus den UBX-Daten („u‑blox Binary Protocol“) ermitteln (UBX‑NAV‑TIMEUTC --> Flag "fullyResolved"), ...hmmm, kann mein GPS-Modul "UBX"?"
+
+- [ ] UBX entsprechend abfragen oder einfach pauschal 13min warten?
 
 ## Was muss passieren, wenn PPS-Signal für längere Zeit nicht da?
 
@@ -298,7 +309,7 @@ Zeit driftet weg; kritisch, wenn Drift > 0,5s
 
 Noch mal klären, ob es so optimal ist...
 
-- [ ] Geklärt?
+- [x] Geklärt? --> passt schon!
 
 ## Schicke(s) Tool(s), um Qualität dieses NTP-Server mit anderen zu vergleichen
 

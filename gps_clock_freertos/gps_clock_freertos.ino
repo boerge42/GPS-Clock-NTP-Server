@@ -124,8 +124,8 @@ Adafruit_SSD1327 oled(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC,
 SemaphoreHandle_t mutex_oled = NULL;
 
 // FreeRTOS Queues
-QueueHandle_t queue_phaseadj2mqtt;
 QueueHandle_t queue_oled;
+QueueHandle_t queue_mqtt;
 
 // FreeRTOS Task-Handle
 TaskHandle_t handle_task_set_first_datetime = nullptr;
@@ -185,15 +185,6 @@ volatile int sync_level = NO_SYNC;
 
 // globale Variable PPS-Impuls lag an
 volatile boolean pps_is_set = false;
-
-// Message-Defintion für queue_phaseadj2mqtt
-struct phaseadj_t {
-    long phase;
-    long adj;
-    float filtered;
-    float i;
-    long latenz;
-};
 
 // Definitionen für NTP-Server
 #define NTP_UNIX_OFFSET 2208988800UL
@@ -386,10 +377,12 @@ void task_location2oled(void *pvParameters) {
 
 // *********************************************************************
 void task_satellites2oled(void *pvParameters) {
-    oled_t msg;
+    oled_t oled_msg;
+    char mqtt_payload[MQTT_BUFFER_SIZE];
     for (;;) {
-        msg.area = SATELLITES;
-        snprintf(msg.text, sizeof(msg.text), "Sat.: %d/%d (%s)\nHDOP | VDOP | PDOP\n%.2f | %.2f | %.2f",
+        // --> OLED
+        oled_msg.area = SATELLITES;
+        snprintf(oled_msg.text, sizeof(oled_msg.text), "Sat.: %d/%d (%s)\nHDOP | VDOP | PDOP\n%.2f | %.2f | %.2f",
                   gps.satellites.value(),
                   atoi(sats_in_view.value()),
                   fixtype2text(atoi(fix_type.value())),
@@ -397,7 +390,18 @@ void task_satellites2oled(void *pvParameters) {
                   atof(vdop.value()),
                   atof(pdop.value())
                   );
-        xQueueSend(queue_oled, &msg, portMAX_DELAY);
+        xQueueSend(queue_oled, &oled_msg, portMAX_DELAY);
+        // --> MQTT
+        snprintf(mqtt_payload, sizeof(mqtt_payload), "%s satellites=%d,satellites_in_view=%d,fix_type=%d,htop=%.2f,vdop=%.2f,pdop=%.2f", 
+                  MQTT_CLIENT_ID,
+                  gps.satellites.value(),
+                  atoi(sats_in_view.value()),
+                  atoi(fix_type.value()),
+                  gps.hdop.hdop(),
+                  atof(vdop.value()),
+                  atof(pdop.value())
+                  );
+        xQueueSend(queue_mqtt, &mqtt_payload, portMAX_DELAY);        
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -408,9 +412,10 @@ void task_satellites2oled(void *pvParameters) {
 void task_set_first_datetime(void *pvParameters) {
     for (;;) {
 
-        // ...dieser if scheint noch nicht ganz zu reichen (Versatz von 1-2s zur Realität gesehen...), 
-        // evtl. müssen noch hdop, vdop und/oder pdop betrachtet werden?  
-        if (gps.date.isValid() && gps.time.isValid() && atoi(fix_type.value()) == 3 && (gps.date.year() > 2025)) {
+        // dieser if scheint noch nicht ganz zu reichen (Versatz von 1-2s zur Realität gesehen...), 
+        // ...evtl. müssen noch hdop, vdop und/oder pdop betrachtet werden --> scheint auch nicht zu reichen (tof(pdop.value()) < 2.0)
+        // ...nach 12-13min kommt eine genauere Zeit...? hmmm, wovon kann man das fest machen?
+        if (gps.date.isValid() && gps.time.isValid() && atoi(fix_type.value()) == 3 && (atof(pdop.value()) < 2.0) && (gps.date.year() > 2025)) {
                 struct tm t = {0};
                 t.tm_year = gps.date.year() - 1900;
                 t.tm_mon  = gps.date.month() - 1;
@@ -479,8 +484,7 @@ void task_adjtime(void *pvParameters) {
     const float Ki    = 0.0001f;
     
     oled_t msg_oled;
-    phaseadj_t msg;
-
+    
     for (;;) {
         // Blockiert bis PPS kommt
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -515,12 +519,16 @@ void task_adjtime(void *pvParameters) {
         adjtime(&adj, nullptr);
         
         // --> MQTT
-        msg.phase = phase;
-        msg.adj   = adj_usec;
-        msg.filtered = filtered;
-        msg.i = I;
-        msg.latenz = latenz;
-        xQueueSend(queue_phaseadj2mqtt, &msg, portMAX_DELAY);
+        char mqtt_payload[MQTT_BUFFER_SIZE];
+        snprintf(mqtt_payload, sizeof(mqtt_payload), "%s phase=%d,adj=%d,filtered=%f,i=%f,latenz=%d", 
+                  MQTT_CLIENT_ID,
+                  phase,
+                  adj_usec,
+                  filtered,
+                  I,
+                  latenz
+                  );
+        xQueueSend(queue_mqtt, &mqtt_payload, portMAX_DELAY);
         
         // --> OLED
         msg_oled.area = PPS_INTERVAL;
@@ -586,20 +594,11 @@ void task_msg2oled(void *pvParameters) {
 
 // *********************************************************************
 // ein paar interessante Werte via MQTT in die Welt senden...
-void task_phaseadj2mqtt(void *pvParameters) {
-    phaseadj_t msg;
+void task_msg2mqtt(void *pvParameters) {
     char mqtt_payload[MQTT_BUFFER_SIZE];
     for (;;) {
-        if (xQueueReceive(queue_phaseadj2mqtt, &msg, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(queue_mqtt, &mqtt_payload, portMAX_DELAY) == pdTRUE) {
             // MQTT senden
-            sprintf(mqtt_payload, "%s phase=%d,adj=%d,filtered=%f,i=%f,latenz=%d", 
-                    MQTT_CLIENT_ID,
-                    msg.phase,
-                    msg.adj,
-                    msg.filtered,
-                    msg.i,
-                    msg.latenz
-                   );
             mqtt_client.publish(MQTT_TOPIC, mqtt_payload, false);
         }
     }
@@ -711,9 +710,9 @@ void setup() {
     } 
     
     // FreeRTOS Queues
-    queue_phaseadj2mqtt = xQueueCreate(5, sizeof(phaseadj_t));   
-    if (queue_phaseadj2mqtt == NULL) {
-        Serial.println("Problem bei Erzeugung queue_phaseadj2mqtt!");
+    queue_mqtt = xQueueCreate(5, MQTT_BUFFER_SIZE);   
+    if (queue_mqtt == NULL) {
+        Serial.println("Problem bei Erzeugung queue_mqtt!");
         while (1);
     }
     queue_oled = xQueueCreate(10, sizeof(oled_t));   
@@ -725,7 +724,7 @@ void setup() {
     // FreeRTOS-Tasks starten
     xTaskCreatePinnedToCore(task_gps_read, "task_gps_read", 4096, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(task_location2oled, "task_location2oled", 4096, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(task_phaseadj2mqtt, "task_phaseadj2mqtt", 4096, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(task_msg2mqtt, "task_msg2mqtt", 4096, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(task_datetime2oled, "task_datetime2oled", 4096, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(task_satellites2oled, "task_satellites2oled", 4096, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(task_set_first_datetime, "task_set_first_datetime", 4096, NULL, 1, &handle_task_set_first_datetime, 1);

@@ -1,10 +1,11 @@
+#!/usr/bin/python3
 # **********************************************************************
 #
 # Diverse NTP-Server anfragen, Rückgaben auflisten
 # ================================================
-#            Uwe Berger, 2026
+#               Uwe Berger, 2026
 #
-# Absetzen NTP-Request an diverse NTP-Server (Liste NTP_SERVERS) via
+# Absetzen NTP-Request an diverse NTP-Server via
 # Python-Bibliothek ntplib. Aufbereitung der Ergebnisse in einer 
 # Tabelle:
 # 
@@ -16,8 +17,8 @@
 # -----+-------+-------+-----
 # ...  |...    |...    |...
 #
-# Andersrum kann jeder :-) --> Grund: die Breite der Tabelle wird (nur)
-# durch die Anzahl der abgefragten Server bestimmt...
+# ...andersrum (row/col) kann jeder :-) --> Grund: die Breite der 
+# Tabelle wird (nur) durch die Anzahl der abgefragten Server bestimmt...
 #
 #
 # =========
@@ -28,16 +29,11 @@
 import ntplib
 from datetime import datetime
 from tabulate import tabulate
+import sys
+import os
 
 # Liste anzufragender NTP-Server
-NTP_SERVERS = [
-    "10.1.1.149",           # mein ESP32-NTP-Sever
-    "timepi",               # mein RPi-NTP-Server (auch mit GPS-Modul)
-    "fritz.box",            # meine Fritz-Box :-)
-    "de.pool.ntp.org",
-    "time.google.com",
-    "time.cloudflare.com",
-]
+NTP_SERVERS = []
 
 # Ausgabe-Definitionen 
 attr_defs = {
@@ -86,6 +82,44 @@ attr_defs = {
 # **********************************************************************
 # **********************************************************************
 
+# NTP-Server-Liste einlesen
+if len(sys.argv) < 2:
+    print(f"Bitte Dateiname angeben: {sys.argv[0]} <ntp-liste-txt>")
+    sys.exit(1)
+
+fn = sys.argv[1]
+
+# Existenz prüfen (optional, open() würde es auch merken)
+if not os.path.exists(fn):
+    print(f"Fehler: Datei '{fn}' existiert nicht.")
+    sys.exit(1)
+
+try:
+    with open(fn, "r", encoding="utf-8") as f:
+        for line in f:
+            NTP_SERVERS.append(line.rstrip("\n"))
+
+except FileNotFoundError:
+    print(f"Fehler: Datei '{fn}' wurde nicht gefunden.")
+    sys.exit(1)
+
+except PermissionError:
+    print(f"Fehler: Keine Berechtigung zum Lesen von '{fn}'.")
+    sys.exit(1)
+
+except IsADirectoryError:
+    print(f"Fehler: '{fn}' ist ein Verzeichnis, keine Datei.")
+    sys.exit(1)
+    
+except UnicodeDecodeError:
+    print(f"Fehler: '{fn}' ist keine UTF‑8‑Textdatei.")
+    sys.exit(1)
+
+except OSError as e:
+    print(f"Allgemeiner OS-Fehler beim Zugriff auf '{fn}': {e}")
+    sys.exit(1)
+
+
 # NTP-Client erzeugen
 c = ntplib.NTPClient()
 
@@ -94,32 +128,34 @@ results = []
 
 # über Serverliste iterieren 
 for server in NTP_SERVERS:
-    # NTP-Server abfragen
-    r = c.request(server, version=4, timeout=3)
-    
-    # 1.Zeile einer Spalte ist der Name des angefragten NTP-Servers
-    col = {"server":server}
-    
-    # einzelne Attribute der Antwort auslesen/verarbeiten
-    for attr in dir(r):
+    try:
+        # NTP-Server abfragen
+        r = c.request(server, version=4, timeout=3)
         
-        # nur attr, die in attr_defs definiert sind
-        if ((attr in attr_defs) == False):
-            continue
-
-        # der Wert des Attributes
-        value = getattr(r, attr)
+        # 1.Zeile einer Spalte ist der Name des angefragten NTP-Servers
+        col = {"server":server}
         
-        # Wert lt. Definition konvertieren
-        if (attr_defs[attr]["convert"]):
-            value = attr_defs[attr]["convert"](value)
-      
-        # ...und zur Ergebisspalte hinzufügen
-        col[attr]=value
-    
-    # Spalte zum Gesamtergebnis hinzufügen        
-    results.append(col)
+        # einzelne Attribute der Antwort auslesen/verarbeiten
+        for attr in dir(r):
+            
+            # nur attr, die in attr_defs definiert sind
+            if ((attr in attr_defs) == False):
+                continue
 
+            # der Wert des Attributes
+            value = getattr(r, attr)
+            
+            # Wert lt. Definition konvertieren
+            if (attr_defs[attr]["convert"]):
+                value = attr_defs[attr]["convert"](value)
+          
+            # ...und zur Ergebisspalte hinzufügen
+            col[attr]=value
+        
+        # Spalte zum Gesamtergebnis hinzufügen        
+        results.append(col)
+    except:
+        pass
 
 # Ausgabe Tabelle
 
