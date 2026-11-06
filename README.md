@@ -20,7 +20,8 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 
 Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder der Tabelle sowie den folgenden beiden Bildern ablesbar.
 
-`Pin-Verbindungen:
+`
+Pin-Verbindungen:
 +---------+------+------+
 | ESP32-P4| GPS  | OLED |
 +---------+------+------+
@@ -36,7 +37,7 @@ Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechend
 |   20    |      | DIN  |
 +---------+------+------+
 `
-`<img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
+<img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
 
 (Ein einfacher "Schaltplan"...)
 
