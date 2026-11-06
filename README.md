@@ -18,25 +18,7 @@ Für diesen Projekt würden folgende Hardware-Komponenten verwendet:
 - GT-U7 (GPS-Modul mit herausgeführten PPS-Signal)
 - [OLED SSD1327](https://www.waveshare.com/wiki/1.5inch_OLED_Module) als Ausgabemedium für diverse Informationen
 
-Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware und/oder der Tabelle sowie den folgenden beiden Bildern ablesbar.
-
-`
-Pin-Verbindungen:
-+---------+------+------+
-| ESP32-P4| GPS  | OLED |
-+---------+------+------+
-|   GND   | GND  | GND  |
-|   3V3   | VCC  | VCC  |
-|   33    | RXD  |      |
-|   32    | TXD  |      |
-|   27    | PPS  |      |
-|   26    |      | RST  |
-|   23    |      | DC   |
-|   22    |      | CS   |
-|   21    |      | CLK  |
-|   20    |      | DIN  |
-+---------+------+------+
-`
+Die Verkabelung der einzelnen Komponenten untereinander ist aus den entsprechenden Stellen im Quelltext der Firmware sowie den folgenden beiden Bildern ablesbar.
 
 <img title="" src="images/circuit.png" alt="circuid" width="534" data-align="inline">
 
