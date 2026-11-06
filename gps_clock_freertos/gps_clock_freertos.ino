@@ -265,29 +265,16 @@ void eth_event(arduino_event_id_t event) {
     xQueueSend(queue_oled, &msg, portMAX_DELAY);
 }
 
-// ********************************************************************************
+// *********************************************************************
 void mqtt_connect(void) {
-    uint8_t count = 0;
-
-    Serial.println("Connect to MQTT-Broker: ");
-    mqtt_client.setServer(MQTT_BROKER, MQTT_PORT);
-    while (!mqtt_client.connected()) {
-        count++;
-        if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PWD)) {
-            Serial.println("MQTT connected!");  
-        } else {
-            Serial.print(".");
-            Serial.print(mqtt_client.state());
-        }
-        if (count > 10) {
-            Serial.println("...no connection (MQTT-Broker)!!!");
-            Serial.flush();
-            while(1){};
-        }
-        delay(100);
-    } 
+    
     mqtt_client.setBufferSize(MQTT_BUFFER_SIZE); 
+    mqtt_client.setServer(MQTT_BROKER, MQTT_PORT);
+    if (!mqtt_client.connected()) {
+        mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PWD);
+    }
 }
+
 
 // *********************************************************************
 void IRAM_ATTR isr_pps_signal() {
@@ -350,6 +337,7 @@ long adjtime_remaining() {
 }
 
 // *********************************************************************
+// *********************************************************************
 void task_gps_read(void *pvParameters) {
     for (;;) {
         while (gpsSerial.available()) {
@@ -359,6 +347,7 @@ void task_gps_read(void *pvParameters) {
     }
 }
 
+// *********************************************************************
 // *********************************************************************
 void task_location2oled(void *pvParameters) {
     oled_t msg;
@@ -375,6 +364,7 @@ void task_location2oled(void *pvParameters) {
     }
 }
 
+// *********************************************************************
 // *********************************************************************
 void task_satellites2oled(void *pvParameters) {
     oled_t oled_msg;
@@ -406,6 +396,7 @@ void task_satellites2oled(void *pvParameters) {
     }
 }
 
+// *********************************************************************
 // *********************************************************************
 // ...wird nur einmal zum Setzen von Datum/Uhrzeit aus den GPS-Daten
 // benötigt welche aber noch nicht mit dem PPS-Signal synchronisiert 
@@ -447,6 +438,7 @@ void task_set_first_datetime(void *pvParameters) {
 }
 
 // *********************************************************************
+// *********************************************************************
 // ...vorher gesetztes Datum/Uhrzeit einmalig mit PPS-Signal synchronisieren
 void task_sync_datetime(void *pvParameters) {
     for (;;) {
@@ -472,6 +464,7 @@ void task_sync_datetime(void *pvParameters) {
     }
 }
 
+// *********************************************************************
 // *********************************************************************
 // adjtime() mit PPS-Interval-Drift etc. (PI-Regler)
 void task_adjtime(void *pvParameters) {
@@ -541,6 +534,7 @@ void task_adjtime(void *pvParameters) {
 }
 
 // *********************************************************************
+// *********************************************************************
 void task_datetime2oled(void *pvParameters) {
     time_t now;
     tm tm;
@@ -566,6 +560,7 @@ void task_datetime2oled(void *pvParameters) {
     }
 }
 
+// *********************************************************************
 // *********************************************************************
 // zentrale Task, die auf das OLED schreibt; Mutex eigentlich nicht notwendig,
 // wenn es so bleibt
@@ -593,6 +588,7 @@ void task_msg2oled(void *pvParameters) {
 }
 
 // *********************************************************************
+// *********************************************************************
 // ein paar interessante Werte via MQTT in die Welt senden...
 void task_msg2mqtt(void *pvParameters) {
     char mqtt_payload[MQTT_BUFFER_SIZE];
@@ -604,6 +600,23 @@ void task_msg2mqtt(void *pvParameters) {
     }
 }
 
+// *********************************************************************
+// *********************************************************************
+// Verbindung zu MQTT-Broker halten und MQTT-Loop
+void task_mqtt_control(void *pvParameters) {
+    
+    for (;;) {
+        // mit MQTT-Broker verbunden?
+        if (!mqtt_client.connected()) {
+            mqtt_connect();
+        } else {
+            mqtt_client.loop();
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// *********************************************************************
 // *********************************************************************
 // Verarbeitung von NTP-Requests
 void task_ntpserver(void *param) {
@@ -737,8 +750,8 @@ void setup() {
     Network.onEvent(eth_event);  // eth_event() wird aufgerufen, wenn es einen Status-Wechsel an ETH gibt
     ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
     
-    // MQTT
-    mqtt_connect(); 
+    // MQTT (erst nach Init Ethernet!) 
+    xTaskCreatePinnedToCore(task_mqtt_control, "task_mqtt_control", 4096, NULL, 1, NULL, 1);    
 
     // UDP (NTP)
     udp.begin(NTP_PORT);
